@@ -2,7 +2,7 @@ name: Scan LinkedIn Emails (WishLoop)
 
 on:
   schedule:
-    - cron: '0 7 * * *'
+    - cron: '0 7 * * *'  # Daily at 7 AM UTC
   workflow_dispatch:
     inputs:
       daysBack:
@@ -10,7 +10,7 @@ on:
         required: false
         default: '360'
       maxEmails:
-        description: 'Maximum number of emails to fetch'
+        description: 'Maximum emails per user'
         required: false
         default: '300'
       dry_run:
@@ -21,9 +21,8 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Call WishLoop function (scanLinkedInEmails)
+      - name: Scan all users' LinkedIn emails
         env:
           WISHLOOP_URL: ${{ secrets.WISHLOOP_URL }}
           API_KEY: ${{ secrets.BASE44_API_KEY }}
@@ -33,9 +32,7 @@ jobs:
 
         run: |
           set -euo pipefail
-
-          echo "Invoking scanLinkedInEmails (daysBack=${DAYS_BACK}, maxEmails=${MAX_EMAILS}, dry_run=${DRY_RUN})"
-
+          
           URL="${WISHLOOP_URL}/functions/scanLinkedInEmails"
           
           HTTP_CODE=$(curl -sS -w "%{http_code}" -o /tmp/resp.json \
@@ -48,6 +45,6 @@ jobs:
           cat /tmp/resp.json || true
 
           case "${HTTP_CODE}" in
-            200|201|202) echo "✅ Function call succeeded." ;;
-            *) echo "❌ Function call returned HTTP ${HTTP_CODE}" >&2; exit 1 ;;
+            200|201|202) echo "✅ Successfully scanned all users" ;;
+            *) echo "❌ Scan failed with HTTP ${HTTP_CODE}" >&2; exit 1 ;;
           esac
