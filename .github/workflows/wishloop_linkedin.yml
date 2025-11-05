@@ -27,7 +27,7 @@ jobs:
       - name: Call WishLoop function (scanLinkedInEmails)
         env:
           # GitHub → Repo → Settings → Secrets and variables → Actions
-          APP_ID:  ${{ secrets.BASE44_APP_ID }}            # e.g. 6902d23cfff0eb754ab4d767
+          APP_ID:  ${{ secrets.BASE44_APP_ID }}            # e.g. 
           API_KEY: ${{ secrets.BASE44_API_KEY }}           # your Base44/WishLoop API key
           BASE_URL: ${{ secrets.WISHLOOP_URL }}           # e.g. https://wish-loop-4ab4d767.base44.app (no trailing slash)
         run: |
