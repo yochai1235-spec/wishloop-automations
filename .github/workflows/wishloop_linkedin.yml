@@ -1,7 +1,7 @@
 name: Scan LinkedIn Emails (WishLoop)
 
 on:
-  # Schedule: every hour (UTC). Change to '0 7 * * *' for 07:00 UTC daily, etc.
+  # Schedule: run every day at 07:00 UTC 
   schedule:
     - cron: '0 7 * * *'
   workflow_dispatch:
@@ -22,19 +22,45 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+
     steps:
       - name: Call WishLoop function (scanLinkedInEmails)
         env:
-          # Stored as GitHub → Settings → Secrets and variables → Actions
-          APP_ID:  ${{ secrets.BASE44_APP_ID }}  
-          API_KEY: ${{ secrets.BASE44_API_KEY }}  # your WishLoop api_key
+          # GitHub → Settings → Secrets and variables → Actions
+          APP_ID:  ${{ secrets.BASE44_APP_ID }}
+          API_KEY: ${{ secrets.BASE44_API_KEY }}
+          BASE_URL: ${{ secrets.WISHLOOP_URL }}
           DAYS_BACK:  ${{ github.event.inputs.daysBack  || '360' }}
           MAX_EMAILS: ${{ github.event.inputs.maxEmails || '300' }}
-          DRY_RUN:    ${{ github.event.inputs.dry_run   || 'false' }}
+          DRY_RUN_IN: ${{ github.event.inputs.dry_run   || 'false' }}
         run: |
+          set -e
+
+          # Normalize dry_run to true/false (boolean, not string)
+          if [ "$DRY_RUN_IN" = "true" ] || [ "$DRY_RUN_IN" = "True" ]; then
+            DRY_RUN=true
+          else
+            DRY_RUN=false
+          fi
+
           echo "Running scanLinkedInEmails for ${DAYS_BACK} days back, max ${MAX_EMAILS} emails (dry_run=${DRY_RUN})"
-          curl -s -X POST "https://wish-loop-4ab4d767.base44.app/api/apps/${APP_ID}/functions/scanLinkedInEmails" \
+
+          # Build JSON body safely
+          BODY=$(printf '{"daysBack": %s, "maxEmails": %s, "dry_run": %s}' \
+                 "$DAYS_BACK" "$MAX_EMAILS" "$DRY_RUN")
+
+          # POST to WishLoop
+          HTTP_CODE=$(curl -sS -o /tmp/resp.json -w "%{http_code}" \
+            -X POST "${BASE_URL}/api/apps/${APP_ID}/functions/scanLinkedInEmails" \
             -H "Content-Type: application/json" \
             -H "api_key: ${API_KEY}" \
-            -d "{\"daysBack\": ${DAYS_BACK}, \"maxEmails\": ${MAX_EMAILS}, \"dry_run\": ${DRY_RUN}}" \
-            | jq .
+            -d "$BODY")
+
+          echo "HTTP $HTTP_CODE"
+          cat /tmp/resp.json
+
+          # Fail the job if not 2xx
+          case "$HTTP_CODE" in
+            2*) echo "OK";;
+            *) echo "Request failed"; exit 1;;
+          esac
