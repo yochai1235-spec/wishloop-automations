@@ -1,9 +1,10 @@
 name: Scan LinkedIn Emails (WishLoop)
 
 on:
-  # Schedule: runs daily at 07:00 UTC. Change the cron below for a different hour.
+  # Runs every day at 07:00 UTC (change as you like)
   schedule:
     - cron: '0 7 * * *'
+  # Allow manual runs with parameters
   workflow_dispatch:
     inputs:
       daysBack:
@@ -23,62 +24,29 @@ jobs:
   run:
     runs-on: ubuntu-latest
     steps:
-      - name: Prepare endpoint and inputs
-        shell: bash
-        run: |
-          set -euo pipefail
-          
-          # Get the App ID from GitHub Secrets; use fallback if missing
-          APP_ID="${{ secrets.BASE44_APP_ID }}"
-          if [ -z "${APP_ID:-}" ]; then
-            APP_ID="6902d23cfff0eb754ab4d767"
-          fi
-
-          # Build the API endpoint
-          ENDPOINT="https://wish-loop-4ab4d767.base44.app/api/apps/${APP_ID}/functions/scanLinkedInEmails"
-
-          # Default values (if not provided via workflow dispatch)
-          DAYS_BACK="${{ github.event.inputs.daysBack || '360' }}"
-          MAX_EMAILS="${{ github.event.inputs.maxEmails || '300' }}"
-          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
-
-          # Export variables to the next step
-          {
-            echo "ENDPOINT=${ENDPOINT}"
-            echo "DAYS_BACK=${DAYS_BACK}"
-            echo "MAX_EMAILS=${MAX_EMAILS}"
-            echo "DRY_RUN=${DRY_RUN}"
-          } >> "$GITHUB_ENV"
-
       - name: Call WishLoop function (scanLinkedInEmails)
         env:
-          API_KEY: ${{ secrets.BASE44_API_KEY }}
-          ENDPOINT: ${{ env.ENDPOINT }}
-          DAYS_BACK: ${{ env.DAYS_BACK }}
-          MAX_EMAILS: ${{ env.MAX_EMAILS }}
-          DRY_RUN: ${{ env.DRY_RUN }}
-        shell: bash
+          # GitHub → Repo → Settings → Secrets and variables → Actions
+          APP_ID:  ${{ secrets.BASE44_APP_ID }}            # e.g. 6902d23cfff0eb754ab4d767
+          API_KEY: ${{ secrets.BASE44_API_KEY }}           # your Base44/WishLoop API key
+          BASE_URL: ${{ secrets.WISHLOOP_URL }}           # e.g. https://wish-loop-4ab4d767.base44.app (no trailing slash)
         run: |
           set -euo pipefail
 
-          # Validate required secrets
-          if [ -z "${API_KEY:-}" ]; then
-            echo "ERROR: Secret BASE44_API_KEY is missing." >&2
-            exit 1
-          fi
+          # Read inputs with safe defaults
+          DAYS_BACK='${{ github.event.inputs.daysBack || '360' }}'
+          MAX_EMAILS='${{ github.event.inputs.maxEmails || '300' }}'
+          DRY_RUN='${{ github.event.inputs.dry_run   || 'false' }}'
 
-          echo "Running LinkedIn email scan..."
-          echo "Endpoint: ${ENDPOINT}"
-          echo "Parameters: daysBack=${DAYS_BACK}, maxEmails=${MAX_EMAILS}, dry_run=${DRY_RUN}"
+          # Ensure BASE_URL has no trailing slash, then build the endpoint
+          TRIMMED_BASE_URL="${BASE_URL%/}"
+          URL="${TRIMMED_BASE_URL}/api/apps/${APP_ID}/functions/scanLinkedInEmails"
 
-          # Make the API request
-          # -fS ensures the job fails if HTTP status >= 400
-          curl -fS -X POST "${ENDPOINT}" \
+          echo "POST ${URL}"
+          echo "Payload: daysBack=${DAYS_BACK}, maxEmails=${MAX_EMAILS}, dry_run=${DRY_RUN}"
+
+          # Call your WishLoop server function
+          curl -sS -X POST "${URL}" \
             -H "Content-Type: application/json" \
             -H "api_key: ${API_KEY}" \
-            --data-binary "$(jq -n --argjson db "${DAYS_BACK}" \
-                               --argjson me "${MAX_EMAILS}" \
-                               --arg dr "${DRY_RUN}" \
-                               '{daysBack:$db, maxEmails:$me, dry_run:($dr | test("^(?i:true)$")) }' 2>/dev/null \
-                             || echo "{\"daysBack\": ${DAYS_BACK}, \"maxEmails\": ${MAX_EMAILS}, \"dry_run\": ${DRY_RUN}}")" \
-            | tee /dev/stdout
+            -d "{\"daysBack\": ${DAYS_BACK}, \"maxEmails\": ${MAX_EMAILS}, \"dry_run\": ${DRY_RUN}}"
