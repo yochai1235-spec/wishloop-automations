@@ -1,10 +1,8 @@
 name: Scan LinkedIn Emails (WishLoop)
 
 on:
-  # Schedule: every day at 07:00 UTC. Change cron if you prefer another time.
   schedule:
     - cron: '0 7 * * *'
-  # Allow manual runs with optional overrides
   workflow_dispatch:
     inputs:
       daysBack:
@@ -27,53 +25,29 @@ jobs:
     steps:
       - name: Call WishLoop function (scanLinkedInEmails)
         env:
-          # === Secrets you set in GitHub → Settings → Secrets and variables → Actions ===
-          # WISHLOOP_URL example: https://wish-loop-4ab4d767.base44.app   (NO trailing slash)
           WISHLOOP_URL: ${{ secrets.WISHLOOP_URL }}
-          # APP_ID is ONLY the app id (numbers/hex), NOT a URL
-          APP_ID:        ${{ secrets.BASE44_APP_ID }}
-          # API key/token from WishLoop/Base44
-          API_KEY:       ${{ secrets.BASE44_API_KEY }}
-
-          # === Inputs (with defaults if you don't pass any on manual run) ===
-          DAYS_BACK:  ${{ github.event.inputs.daysBack  || '360' }}
+          API_KEY: ${{ secrets.BASE44_API_KEY }}
+          DAYS_BACK: ${{ github.event.inputs.daysBack || '360' }}
           MAX_EMAILS: ${{ github.event.inputs.maxEmails || '300' }}
-          DRY_RUN:    ${{ github.event.inputs.dry_run   || 'false' }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
 
         run: |
           set -euo pipefail
 
           echo "Invoking scanLinkedInEmails (daysBack=${DAYS_BACK}, maxEmails=${MAX_EMAILS}, dry_run=${DRY_RUN})"
 
-          # --- Primary call: many Base44 envs expose functions as GET with query params ---
-          URL="${WISHLOOP_URL}/api/apps/${APP_ID}/functions/scanLinkedInEmails"
-          QUERY="daysBack=${DAYS_BACK}&maxEmails=${MAX_EMAILS}&dry_run=${DRY_RUN}"
-
-          echo "GET ${URL}?${QUERY}"
-          # If your environment expects a bearer token instead of 'api_key', swap the header line accordingly.
+          URL="${WISHLOOP_URL}/functions/scanLinkedInEmails"
+          
           HTTP_CODE=$(curl -sS -w "%{http_code}" -o /tmp/resp.json \
-            -X GET "${URL}?${QUERY}" \
-            -H "api_key: ${API_KEY}" \
-            -H "Accept: application/json")
+            -X POST "${URL}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${API_KEY}" \
+            -d "{\"daysBack\": ${DAYS_BACK}, \"maxEmails\": ${MAX_EMAILS}, \"dry_run\": ${DRY_RUN}}")
 
           echo "HTTP ${HTTP_CODE}"
           cat /tmp/resp.json || true
 
-          if [ "${HTTP_CODE}" = "405" ]; then
-            echo "GET not allowed (405). Retrying with POST and JSON body…"
-            # --- Fallback: some environments require :invoke for POSTed functions ---
-            POST_URL="${URL}:invoke"
-            HTTP_CODE=$(curl -sS -w "%{http_code}" -o /tmp/resp.json \
-              -X POST "${POST_URL}" \
-              -H "Content-Type: application/json" \
-              -H "api_key: ${API_KEY}" \
-              -d "{\"daysBack\": ${DAYS_BACK}, \"maxEmails\": ${MAX_EMAILS}, \"dry_run\": ${DRY_RUN}}")
-            echo "HTTP ${HTTP_CODE}"
-            cat /tmp/resp.json || true
-          fi
-
-          # Optional: treat non-2xx as failure to surface issues in the Actions UI
           case "${HTTP_CODE}" in
-            200|201|202) echo "Function call succeeded." ;;
-            *) echo "Function call returned HTTP ${HTTP_CODE}" >&2; exit 1 ;;
+            200|201|202) echo "✅ Function call succeeded." ;;
+            *) echo "❌ Function call returned HTTP ${HTTP_CODE}" >&2; exit 1 ;;
           esac
