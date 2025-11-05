@@ -1,0 +1,40 @@
+name: Scan LinkedIn Emails (WishLoop)
+
+on:
+  # Schedule: every hour (UTC). Change to '0 7 * * *' for 07:00 UTC daily, etc.
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+    inputs:
+      daysBack:
+        description: 'How many days back to scan'
+        required: false
+        default: '360'
+      maxEmails:
+        description: 'Maximum number of emails to fetch'
+        required: false
+        default: '300'
+      dry_run:
+        description: 'Dry run mode (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call WishLoop function (scanLinkedInEmails)
+        env:
+          # Stored as GitHub → Settings → Secrets and variables → Actions
+          APP_ID:  ${{ secrets.BASE44_APP_ID }}  
+          API_KEY: ${{ secrets.BASE44_API_KEY }}  # your WishLoop api_key
+          DAYS_BACK:  ${{ github.event.inputs.daysBack  || '360' }}
+          MAX_EMAILS: ${{ github.event.inputs.maxEmails || '300' }}
+          DRY_RUN:    ${{ github.event.inputs.dry_run   || 'false' }}
+        run: |
+          echo "Running scanLinkedInEmails for ${DAYS_BACK} days back, max ${MAX_EMAILS} emails (dry_run=${DRY_RUN})"
+          curl -s -X POST "https://wish-loop-4ab4d767.base44.app/api/apps/${APP_ID}/functions/scanLinkedInEmails" \
+            -H "Content-Type: application/json" \
+            -H "api_key: ${API_KEY}" \
+            -d "{\"daysBack\": ${DAYS_BACK}, \"maxEmails\": ${MAX_EMAILS}, \"dry_run\": ${DRY_RUN}}" \
+            | jq .
