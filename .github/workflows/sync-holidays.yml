@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Sync holidays for user
+      - name: Sync holidays for ALL users automatically
         run: |
-          curl -X POST https://wish-loop-4ab4d767.base44.app/api/apps/6902d23cfff0eb754ab4d767/functions/syncReligiousHolidays \
+          curl -X POST https://wish-loop-4ab4d767.base44.app/api/apps/6902d23cfff0eb754ab4d767/functions/syncReligiousHolidaysAutomated \
             -H "Content-Type: application/json" \
             -H "api_key: ${{ secrets.BASE44_API_KEY }}" \
-            -d '{"user_email": "yochai1235@gmail.com", "days_ahead": 60}'
+            -d '{}'
