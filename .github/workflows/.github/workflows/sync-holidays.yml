@@ -1,0 +1,23 @@
+name: Sync Religious Holidays Daily
+
+on:
+  schedule:
+    # Runs every day at 2 AM UTC (you can adjust this)
+    - cron: '0 2 * * *'
+  
+  # Allows you to manually trigger from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  sync-holidays:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Sync holidays for all users
+        run: |
+          curl -X POST https://wish-loop-4ab4d767.base44.app/functions/syncReligiousHolidays \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.BASE44_SERVICE_ROLE_KEY }}" \
+            -d '{
+              "sync_all_users": true
+            }'
