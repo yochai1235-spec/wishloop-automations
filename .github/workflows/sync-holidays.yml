@@ -2,17 +2,17 @@ name: Sync Religious Holidays Daily
 
 on:
   schedule:
-    - cron: '0 2 * * *'
-  workflow_dispatch:
+    - cron: '0 2 * * *'  # Runs daily at 2 AM UTC
+  workflow_dispatch:      # Allows manual trigger
 
 jobs:
   sync-holidays:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Sync holidays for ALL users
+      - name: Sync holidays for all users automatically
         run: |
           curl -X POST https://wish-loop-4ab4d767.base44.app/api/apps/6902d23cfff0eb754ab4d767/functions/syncReligiousHolidaysAutomated \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.BASE44_SERVICE_KEY }}" \
+            -H "api_key: ${{ secrets.BASE44_API_KEY }}" \
             -d '{}'
